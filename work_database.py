@@ -65,7 +65,7 @@ def words(chat_id):
 # Deleting a word from a user
 def delete_word(chat_id, en, ru):
 
-    print(chat_id, en, ru)
+    # print(chat_id, en, ru)
     index = (session.query(m.UserLibrary.id).
              select_from(m.UserLibrary).
              join(m.TranslationWords).

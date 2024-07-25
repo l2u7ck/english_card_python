@@ -71,8 +71,6 @@ class UserLibrary(Base):
 
 def create_db():
 
-    create_table(engine)
-
     # Insert initial data
     en_words = ['All', 'How', 'Boy', 'People', 'Air', 'City', 'Room', 'Bad', 'Close', 'Run']
     for word in en_words:
@@ -96,5 +94,6 @@ def create_table(engine):
 
 if __name__ == '__main__':
 
+    create_table(engine)
     create_db()
     session.close()

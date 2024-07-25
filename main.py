@@ -47,7 +47,9 @@ def create_cards(message):
 
     if db.search_user(cid):
         db.new_user_db(cid)
-        bot.send_message(cid, "Hello, stranger, let study English...")
+        bot.send_message(cid, "Привет, давай подтянем твои знания по английскому ☝☝☝\n"
+                              "Ты можешь использовать этот тренажер, как конструктор добавляя или удаляя слова.\n"
+                              "Ну что, начнём ⬇️")
 
     markup = types.ReplyKeyboardMarkup(row_width=2)
 
