@@ -1,5 +1,25 @@
+import os
+import sqlalchemy
 import sqlalchemy as sq
-from sqlalchemy.orm import declarative_base, relationship
+from dotenv import load_dotenv, dotenv_values
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+
+# connecting environment variables (env)
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+if os.path.exists(dotenv_path):
+    print(load_dotenv(dotenv_path))
+
+# Database connection
+DSN = (f'{dotenv_values()['CONNECTION_DRIVER']}://'
+       f'{dotenv_values()['LOGIN']}:'
+       f'{dotenv_values()['PASSWORD']}@'
+       f'{dotenv_values()['HOST']}:'
+       f'{dotenv_values()['PORT']}/'
+       f'{dotenv_values()['TITLE_DB']}')
+
+engine = sqlalchemy.create_engine(DSN)
+Session = sessionmaker(bind=engine)
+session = Session()
 
 Base = declarative_base()
 
@@ -49,7 +69,32 @@ class UserLibrary(Base):
     translation_words_id = sq.Column(sq.Integer, sq.ForeignKey('translation_words.id'), nullable=False)
 
 
+def create_db():
+
+    create_table(engine)
+
+    # Insert initial data
+    en_words = ['All', 'How', 'Boy', 'People', 'Air', 'City', 'Room', 'Bad', 'Close', 'Run']
+    for word in en_words:
+        session.add(EnglishWords(word=word))
+
+    ru_words = ['Все', 'Как', 'Мальчик', 'Люди', 'Воздух', 'Город', 'Комната', 'Плохо', 'Закрытый', 'Бежать']
+    for word in ru_words:
+        session.add(RussianWords(word=word))
+
+    for idx in range(1, 11):
+        session.add(TranslationWords(english_words_id=idx, russian_words_id=idx))
+
+    session.commit()
+
+
 def create_table(engine):
 
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+
+
+if __name__ == '__main__':
+
+    create_db()
+    session.close()

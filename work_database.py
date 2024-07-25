@@ -1,48 +1,11 @@
-import sqlalchemy
 import random
-from sqlalchemy.orm import sessionmaker
-import os
-from dotenv import load_dotenv
-from dotenv import dotenv_values
+from string import capwords
+
 import models as m
-
-# connecting environment variables (env)
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
-if os.path.exists(dotenv_path):
-    print(load_dotenv(dotenv_path))
-
-# Database connection
-DSN = (f'{dotenv_values()['CONNECTION_DRIVER']}://'
-       f'{dotenv_values()['LOGIN']}:'
-       f'{dotenv_values()['PASSWORD']}@'
-       f'{dotenv_values()['HOST']}:'
-       f'{dotenv_values()['PORT']}/'
-       f'{dotenv_values()['TITLE_DB']}')
-
-engine = sqlalchemy.create_engine(DSN)
-Session = sessionmaker(bind=engine)
-session = Session()
+from models import session
 
 
-def create_db():
-
-    m.create_table(engine)
-
-    # Insert initial data
-    en_words = ['All', 'How', 'Boy', 'People', 'Air', 'City', 'Room', 'Bad', 'Close', 'Run']
-    for word in en_words:
-        session.add(m.EnglishWords(word=word))
-
-    ru_words = ['Все', 'Как', 'Мальчик', 'Люди', 'Воздух', 'Город', 'Комната', 'Плохо', 'Закрытый', 'Бежать']
-    for word in ru_words:
-        session.add(m.RussianWords(word=word))
-
-    for idx in range(1, 11):
-        session.add(m.TranslationWords(english_words_id=idx, russian_words_id=idx))
-
-    session.commit()
-
-
+# Adding a new user
 def new_user_db(chat_id):
 
     session.add(m.Users(chat_id=chat_id))
@@ -56,6 +19,7 @@ def new_user_db(chat_id):
     session.commit()
 
 
+# Checking if a user exists in the database
 def search_user(chat_id):
 
     q = session.query(m.Users).filter(m.Users.chat_id == chat_id).first()
@@ -65,6 +29,7 @@ def search_user(chat_id):
         return False
 
 
+# Randomly picks up four words and translates one
 def words(chat_id):
 
     all_words = (session.query(m.RussianWords, m.EnglishWords).
@@ -74,41 +39,89 @@ def words(chat_id):
                  join(m.UserLibrary).
                  join(m.Users).filter(m.Users.chat_id == chat_id).all())
 
-    val = list()
-
-    while len(val) < 4:
+    if len(all_words) > 6:
+        val = list()
+        rand_words = list()
 
         rand = random.randint(0, len(all_words)-1)
-        if rand not in val:
-            val.append(rand)
+        val.append(rand)
+        wt = all_words[val[0]]
 
-    wt = all_words[val[0]]
+        while len(val) < 4:
+            rand = random.randint(0, len(all_words) - 1)
 
-    rand_words = list()
+            if rand not in val:
+                if all_words[rand][0].id != wt[0].id:
 
-    for numb in range(1, 4):
-        rand_words.append(all_words[val[numb]][1].word)
+                    rand_words.append(all_words[rand][1].word)
+                    val.append(rand)
 
-    return [wt[0].word, wt[1].word]+rand_words
+        return [wt[0].word, wt[1].word]+rand_words
+
+    else:
+        return []
 
 
+# Deleting a word from a user
 def delete_word(chat_id, en, ru):
 
     print(chat_id, en, ru)
     index = (session.query(m.UserLibrary.id).
-         select_from(m.UserLibrary).
-         join(m.TranslationWords).
-         join(m.Users).
-         join(m.EnglishWords).
-         join(m.RussianWords).
-         filter(m.EnglishWords.word == en, m.RussianWords.word == ru, m.Users.chat_id == chat_id)).first()
+             select_from(m.UserLibrary).
+             join(m.TranslationWords).
+             join(m.Users).
+             join(m.EnglishWords).
+             join(m.RussianWords).
+             filter(m.EnglishWords.word == en, m.RussianWords.word == ru, m.Users.chat_id == chat_id)).first()
 
-    session.query(m.UserLibrary).filter(m.UserLibrary.id == index[0]).delete()
-    session.commit()
+    if index is None:
+        return False
+
+    else:
+        session.query(m.UserLibrary).filter(m.UserLibrary.id == index[0]).delete()
+        session.commit()
+        return True
 
 
-# def insert_db():
-if __name__ == '__main__':
+# Adding a word to the database and to the user
+def add_word(chat_id, ru, en):
 
-    create_db()
-    session.close()
+    en = capwords(en.lower())
+    ru = capwords(ru.lower())
+
+    en_id = session.query(m.EnglishWords.id).filter(m.EnglishWords.word == en).first()
+    ru_id = session.query(m.RussianWords.id).filter(m.RussianWords.word == ru).first()
+
+    if en_id is None:
+        session.add(m.EnglishWords(word=en))
+        session.commit()
+        en_id = session.query(m.EnglishWords.id).filter(m.EnglishWords.word == en).first()
+
+    if ru_id is None:
+        session.add(m.RussianWords(word=ru))
+        session.commit()
+        ru_id = session.query(m.RussianWords.id).filter(m.RussianWords.word == ru).first()
+
+    wt = (session.query(m.TranslationWords.id).
+          filter(m.TranslationWords.english_words_id == en_id[0],
+                 m.TranslationWords.russian_words_id == ru_id[0]).first())
+
+    if wt is None:
+        session.add(m.TranslationWords(english_words_id=en_id[0], russian_words_id=ru_id[0]))
+        session.commit()
+        wt = (session.query(m.TranslationWords.id).
+              filter(m.TranslationWords.english_words_id == en_id[0],
+                     m.TranslationWords.russian_words_id == ru_id[0]).first())
+
+    user_id = session.query(m.Users.id).filter(m.Users.chat_id == chat_id).first()[0]
+
+    user_word = (session.query(m.UserLibrary).
+                 filter(m.UserLibrary.user_id == user_id,
+                        m.UserLibrary.translation_words_id == wt[0]).first())
+
+    if user_word is None:
+        session.add(m.UserLibrary(user_id=user_id, translation_words_id=wt[0]))
+        session.commit()
+        return True
+
+    return False
